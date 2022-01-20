@@ -1,16 +1,26 @@
 require("dotenv").config();
+
 const express = require("express");
-const app = express();
+const passport = require("passport");
+
 const connection = require("./connection");
 const User = require("./models/user");
 const userRouter = require("./routes/user");
+const { registerStrategy, loginStrategy} = require("./middleware/auth");
 
-// app.get("/", (req, res) => res.status(200).json({msg: "Worked"}));
+const app = express();
+
 app.use(express.json());
+// app.use(passport.initialize());
+
+//http://localhost/user/getallusers - sends request (req)
 app.use("/user", userRouter);
+
+passport.use("register", registerStrategy);
+passport.use("login", loginStrategy);
 
 app.listen(process.env.PORT, () => {
     connection.authenticate();
-    console.log("App is online");
     User.sync({alter: true});
-})
+    console.log("App is online");
+});

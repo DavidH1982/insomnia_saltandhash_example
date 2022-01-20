@@ -1,41 +1,99 @@
-require("dotenv").config();
-const bcrypt = require("bcrypt");
 const router = require("express").Router();
+const passport = require("passport");
+const jwt = require("jsonwebtoken");
+
 const User = require("../models/user");
-// all users
-router.get("/", async(req, res) => {
+const hash = require("../hash.js");
+const JwtStrategy = require("passport-jwt/lib/strategy");
+const saltRounds = parseInt(process.env.SALT_ROUNDS);
+
+const session = {session: false};
+
+//============================== register user ============================
+
+// takes the authenticated req and returns a response
+const register = async (req, res, next) => {
+    try {
+        req.user.name ? res.status(201).json({msg: 'user registered', user: req.user}): res.status(401).json({msg: "User already exists"});
+    } catch (error) {
+        next(error);
+    }
+};
+
+// http://localhost/user/createuser
+//register router - authenticate using registerStrategy (names 'register') and
+// passes on the register function defined above
+router.post("/registeruser", passport.authenticate("register", session), register);
+
+
+//============================== login  ===============================
+
+const login = async (req, res, next) => {
+    passport.authenticate("login", (err, user) => {
+        try {
+            if (err) {
+                res.status(500).json({msg: "Internal Server Error"});
+            } else if (!user) {
+                res.status(401).json(info);
+            } else {
+                const loginFn = (err) => {
+                    if(err) {
+                        return next(error)
+                    } else {
+                        const userData = {id: user.id, name: user.name};
+                        const data = {user, token: jwt.sign({user: userData}, process.env.SECRET_KEY)};
+                        res.status(200).json(data);
+                    }
+                };
+
+                req.login(user, session, loginFn)
+            }
+        } catch (error) {
+            return next(error);
+        }
+    })(req, res, next); //"IFFY" Immediately Invoked Function Expression
+};
+
+router.post("/userlogin", login);
+
+//================================= ===================================
+// http://localhost/user/getallusers
+// get all users
+router.get("/getallusers", async(req, res) => {
     const allUsers = await User.findAll({
-        attributes: ["id", "name", "createdAt", "updatedAt"]
+        attributes: ["id", "name"]
     });
-    res.status(200).json({data: allUsers});
-});
-router.delete("/", async(req, res) => {
-    const allUsers = await User.destroy({truncate: true})
-    res.status(200).json({msg: "All users have been removed"});
+    res.status(200).json({msg: "worked", data: allUsers});
 });
 
-//individual user
-router.get("/:name", async(req, res) => {
-    const oneUser = await User.findOne({where: {name: req.params.name}, attributes: ["name", "id", "createdAt"]});
-    if (oneUser <= 0){
-        res.status(200).json({msg:`Could not find user. '${req.params.name}' does not exist`})
-    } else {
-    res.status(200).json(oneUser);
-}});
-router.post("/", async(req, res) => {
-    const salt = await bcrypt.genSalt(parseInt(process.env.SALT_ROUNDS));
-    const password = await bcrypt.hash(req.body.password, salt);
-    const user = await User.create({
-        name: req.body.name,
-        password: req.body.password
-    })
-    res.status(201).json({msg: `'${req.body.name}' has been added. Password: ${password}`});
+
+
+// delete all users
+router.delete("/deleteallusers", async(req, res) => {
+    const deletedUser = await User.destroy({where: {}});
+    console.log(deletedUser)
+    res.status(200).json({msg: `Deleted ${deletedUser}`});
 });
-router.delete("/:name", async(req, res) => {
-    if (await User.findOne({where: {name: req.params.name}}) <= 0){
-        res.status(200).json({msg:`Cannot delete user. '${req.params.name}' does not exist`})
-    } else {
-    await User.destroy({where: {name: req.params.name}});
-    res.status(200).json({msg:`'${req.params.name}' has been removed`});
-}});
+
+// get a single user
+router.get("/:id", async(req, res) => {
+    const user = await User.findOne({where: {id: req.params.id}});
+    res.status(200).json({msg: user});
+});
+
+// update a single user
+router.put("/:id", async(req, res) => {
+    const updatedUser = await User.update({name: req.body.newName}, {where: {id: req.params.id}})
+    const user = await User.findOne({where: {id: req.params.id}});
+    res.status(200).json({msg: user});
+});
+
+// delete a single user
+router.delete("/:id", async(req, res) => {
+    const user = await User.findOne({where: {id: req.params.id}});
+    const deletedUser = await user.destroy();
+    console.log(deletedUser)
+    res.status(200).json({msg: deletedUser});
+});
+
 module.exports = router;
