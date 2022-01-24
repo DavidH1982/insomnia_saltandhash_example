@@ -13,7 +13,7 @@ const profile = (req, res, next) => {
     res.status(200).json({msg: "Profile", user: req.user, token: req.query.secret_token});
 };
 
-router.get("/", passport.authentication("JWT", session), profile);
+router.get("/", passport.authenticate("JWT", session), profile);
 
 //========= register a user ============
 
@@ -27,7 +27,7 @@ const register = async (req, res, next) => {
     }
 };
 
-router.post("/registereuser", passport.authenticate("register", session), register);
+router.post("/registeruser", passport.authenticate("register", session), register);
 
 //=============== log in ===============
 
