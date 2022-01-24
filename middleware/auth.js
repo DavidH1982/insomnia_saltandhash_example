@@ -1,5 +1,7 @@
 const bcrypt = require("bcrypt");
 const LocalStrategy = require("passport-local").Strategy;
+const ExtractJWT = require("passport-jwt").ExtractJwt;
+const JWTStrategy = require("passport-jwt").Strategy;
 
 const User = require("../models/user");
 
@@ -33,24 +35,38 @@ const register = async (name, password, next) => {
 
 const login = async (name, password, next) => {
     try {
-        const user = await User.findOne({where: {name: name}})
-
-        if(!user){
-            return next(null, null, {msg: "Incorrect name"});
+        const user = await User.findOne({where: {name: name}});
+        
+        if (!user) {
+            return next(null, null, {message: "Incorrect name"});
         }
 
         const match = await bcrypt.compare(password, user.passwordHash);
-        return match ? next(null, user) : next(null, null, {msg: "Incorrect password"});
+        return match ? next(null, user) : next(null, null, {message: "Incorrect password"});
 
     } catch (error) {
         next(error);
     }
 };
 
+const verify = (token, next) => {
+    try {
+        next(null, token.user);
+    } catch (error) {
+        next(error);
+    }
+};
+
+const verifyStrategy = new JWTStrategy({
+    secretOrKey: process.env.SECRET_KEY,
+    jwtFromRequest: ExtractJWT.fromUrlQueryParameter("secret_token")
+}, verify);
+
 const registerStrategy = new LocalStrategy(mappings, register);
 const loginStrategy = new LocalStrategy(mappings, login);
 
 module.exports = {
     registerStrategy,
-    loginStrategy
+    loginStrategy,
+    verifyStrategy
 };

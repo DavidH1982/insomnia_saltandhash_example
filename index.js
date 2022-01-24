@@ -6,18 +6,24 @@ const passport = require("passport");
 const connection = require("./connection");
 const User = require("./models/user");
 const userRouter = require("./routes/user");
-const { registerStrategy, loginStrategy} = require("./middleware/auth");
+const { registerStrategy, loginStrategy, verifyStrategy } = require("./middleware/auth");
 
 const app = express();
 
 app.use(express.json());
 // app.use(passport.initialize());
+//http://localhost/user/registeruser
+//{
+//  "name": "michael",
+//  "password": "lefgjdflibhg"
+//}
 
 //http://localhost/user/getallusers - sends request (req)
 app.use("/user", userRouter);
 
 passport.use("register", registerStrategy);
 passport.use("login", loginStrategy);
+passport.use(verifyStrategy);
 
 app.listen(process.env.PORT, () => {
     connection.authenticate();

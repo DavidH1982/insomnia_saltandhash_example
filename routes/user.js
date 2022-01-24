@@ -1,44 +1,47 @@
+require("dotenv").config();
 const router = require("express").Router();
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/user");
-const hash = require("../hash.js");
-const JwtStrategy = require("passport-jwt/lib/strategy");
-const saltRounds = parseInt(process.env.SALT_ROUNDS);
 
-const session = {session: false};
+const session = { session: false };
 
-//============================== register user ============================
+// =====================================
 
-// takes the authenticated req and returns a response
+const profile = (req, res, next) => {
+    res.status(200).json({msg: "Profile", user: req.user, token: req.query.secret_token});
+};
+
+router.get("/", passport.authentication("JWT", session), profile);
+
+//========= register a user ============
+
+// takes authenticated req and returns res
+
 const register = async (req, res, next) => {
     try {
-        req.user.name ? res.status(201).json({msg: 'user registered', user: req.user}): res.status(401).json({msg: "User already exists"});
+        req.user.name ? res.status(201).json({msg: 'User Registered', user: req.user}): res.status(401).json({msg: "User already registered"});
     } catch (error) {
         next(error);
     }
 };
 
-// http://localhost/user/createuser
-//register router - authenticate using registerStrategy (names 'register') and
-// passes on the register function defined above
-router.post("/registeruser", passport.authenticate("register", session), register);
+router.post("/registereuser", passport.authenticate("register", session), register);
 
-
-//============================== login  ===============================
+//=============== log in ===============
 
 const login = async (req, res, next) => {
-    passport.authenticate("login", (err, user) => {
+    passport.authenticate("login", (error, user) => {
         try {
-            if (err) {
+            if (error) {
                 res.status(500).json({msg: "Internal Server Error"});
             } else if (!user) {
-                res.status(401).json(info);
+                res.status(401).json({msg: "Not Authorised"});
             } else {
-                const loginFn = (err) => {
-                    if(err) {
-                        return next(error)
+                const loginFn = (error) => {
+                    if (error) {
+                        return next(error);
                     } else {
                         const userData = {id: user.id, name: user.name};
                         const data = {user, token: jwt.sign({user: userData}, process.env.SECRET_KEY)};
@@ -46,54 +49,56 @@ const login = async (req, res, next) => {
                     }
                 };
 
-                req.login(user, session, loginFn)
+                req.login(user, session, loginFn);
+
             }
         } catch (error) {
             return next(error);
         }
-    })(req, res, next); //"IFFY" Immediately Invoked Function Expression
+    })(req, res, next); //IFFY - Immediately Invoked Function Expression
 };
 
 router.post("/userlogin", login);
 
-//================================= ===================================
-// http://localhost/user/getallusers
-// get all users
-router.get("/getallusers", async(req, res) => {
+//=======================================
+
+// all users
+router.get("/", async(req, res) => {
     const allUsers = await User.findAll({
-        attributes: ["id", "name"]
+        attributes: ["id", "name", "createdAt", "updatedAt"]
     });
-    res.status(200).json({msg: "worked", data: allUsers});
+    res.status(200).json({data: allUsers});
 });
 
-
-
-// delete all users
-router.delete("/deleteallusers", async(req, res) => {
-    const deletedUser = await User.destroy({where: {}});
-    console.log(deletedUser)
-    res.status(200).json({msg: `Deleted ${deletedUser}`});
+//=========== delete all users ==========
+router.delete("/", async(req, res) => {
+    const allUsers = await User.destroy({truncate: true})
+    res.status(200).json({msg: "All users have been removed"});
 });
 
-// get a single user
-router.get("/:id", async(req, res) => {
-    const user = await User.findOne({where: {id: req.params.id}});
-    res.status(200).json({msg: user});
-});
+//======== get individual user ==========
+router.get("/:name", async(req, res) => {
+    const oneUser = await User.findOne({where: {name: req.params.name}, attributes: ["name", "id", "createdAt"]});
+    if (oneUser <= 0){
+        res.status(200).json({msg:`Could not find user. '${req.params.name}' does not exist`})
+    } else {
+    res.status(200).json(oneUser);
+}});
 
-// update a single user
+//======== update a single user =========
 router.put("/:id", async(req, res) => {
     const updatedUser = await User.update({name: req.body.newName}, {where: {id: req.params.id}})
     const user = await User.findOne({where: {id: req.params.id}});
     res.status(200).json({msg: user});
 });
 
-// delete a single user
-router.delete("/:id", async(req, res) => {
-    const user = await User.findOne({where: {id: req.params.id}});
-    const deletedUser = await user.destroy();
-    console.log(deletedUser)
-    res.status(200).json({msg: deletedUser});
-});
+//======== delete a single user ========
+router.delete("/:name", async(req, res) => {
+    if (await User.findOne({where: {name: req.params.name}}) <= 0){
+        res.status(200).json({msg:`Cannot delete user. '${req.params.name}' does not exist`})
+    } else {
+    await User.destroy({where: {name: req.params.name}});
+    res.status(200).json({msg:`'${req.params.name}' has been removed`});
+}});
 
-module.exports = router;
+module.exports = router; 
